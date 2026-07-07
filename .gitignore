@@ -1,0 +1,15 @@
+# Environments & Secrets
+fenv/
+mlenv/
+venv/
+.env
+__pycache__/
+
+# Data Files (Zero-Disk Shield)
+*.csv
+*.xlsx
+*.parquet
+*.json
+
+# Power BI Backups
+*.pbix.backup
