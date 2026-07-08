@@ -1,5 +1,7 @@
 # Institutional Liquidity Risk Pipeline (SBA)
 
+![SBA RISK Dashboard](./p3.png)
+
 ## 📌 Business Context
 Mitigating capital loss from loan defaults is a primary mandate for risk officers. When institutions default, the resulting loss of principal and projected interest directly impacts bottom-line liquidity. 
 
