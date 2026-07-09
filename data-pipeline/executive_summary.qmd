@@ -1,0 +1,44 @@
+---
+title: "SBA Liquidity Risk: Cloud Data Pipeline & Analytics"
+author: "Samuel Demi Junior Sarbah"
+format: 
+  html:
+    theme: flatly
+    toc: true
+    toc-title: "Executive Briefing"
+execute:
+  echo: true
+---
+
+## 1. Executive Summary
+
+As a Client Data Manager, ensuring the secure flow and accurate aggregation of financial data is paramount. This project demonstrates an end-to-end data engineering and analytics pipeline designed to evaluate Small Business Administration (SBA) liquidity risk. 
+
+The architecture securely routes public SBA loan data from a PostgreSQL cloud database into a local Python environment for transformation, culminating in an interactive business intelligence dashboard.
+
+---
+
+## 2. Cloud Architecture & Security
+
+To bypass local OS constraints and ensure strict credential security, the pipeline utilizes a strict environment variable vault (`.env`). The data is housed in **Supabase** (PostgreSQL) and queried via raw SQL views to ensure the Python engine only ingests pre-aggregated, necessary metrics.
+
+### The Ingestion Engine (Python)
+The backend was engineered using `psycopg2` and `SQLAlchemy` to establish a secure, zero-disk pipeline directly to the cloud view.
+
+```python
+import os
+import pandas as pd
+from dotenv import load_dotenv
+
+# Secure Vault Extraction
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(dotenv_path=os.path.join(BASE_DIR, '.env'), override=True)
+
+# Cloud Connection Protocol
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise ValueError("SECURITY LOCK: Missing credentials.")
+
+# Ingesting the SQL View
+query = 'SELECT * FROM sba_risk_dashboard_view;'
+sba_data = pd.read_sql(query, DB_URL)
