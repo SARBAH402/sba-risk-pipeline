@@ -20,6 +20,7 @@ df = pd.read_sql("SELECT * FROM ml_ready_sandbox", engine)
 
 # 2. Prepare the Features and Target
 X = df.drop(columns=['is_default'])
+print(X.columns.tolist())
 y = df['is_default']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)

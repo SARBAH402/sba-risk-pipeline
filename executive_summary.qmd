@@ -1,44 +1,117 @@
----
-title: "SBA Liquidity Risk: Cloud Data Pipeline & Analytics"
-author: "Samuel Demi Junior Sarbah"
-format: 
-  html:
-    theme: flatly
-    toc: true
-    toc-title: "Executive Briefing"
-execute:
-  echo: true
----
-
-## 1. Executive Summary
-
-As a Client Data Manager, ensuring the secure flow and accurate aggregation of financial data is paramount. This project demonstrates an end-to-end data engineering and analytics pipeline designed to evaluate Small Business Administration (SBA) liquidity risk. 
-
-The architecture securely routes public SBA loan data from a PostgreSQL cloud database into a local Python environment for transformation, culminating in an interactive business intelligence dashboard.
-
----
-
-## 2. Cloud Architecture & Security
-
-To bypass local OS constraints and ensure strict credential security, the pipeline utilizes a strict environment variable vault (`.env`). The data is housed in **Supabase** (PostgreSQL) and queried via raw SQL views to ensure the Python engine only ingests pre-aggregated, necessary metrics.
-
-### The Ingestion Engine (Python)
-The backend was engineered using `psycopg2` and `SQLAlchemy` to establish a secure, zero-disk pipeline directly to the cloud view.
-
-```python
 import os
+from dash import Dash, html, dcc
+import plotly.express as px
 import pandas as pd
 from dotenv import load_dotenv
 
-# Secure Vault Extraction
+# 1. The Proven Vault Extraction
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(dotenv_path=os.path.join(BASE_DIR, '.env'), override=True)
+env_path = os.path.join(BASE_DIR, '.env')
 
-# Cloud Connection Protocol
+load_dotenv(dotenv_path=env_path, override=True)
 DB_URL = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise ValueError("SECURITY LOCK: Missing credentials.")
 
-# Ingesting the SQL View
-query = 'SELECT * FROM sba_risk_dashboard_view;'
-sba_data = pd.read_sql(query, DB_URL)
+if not DB_URL:
+    raise ValueError("SECURITY LOCK: Engine cannot see the password in .env. Halting execution.")
+
+# Initialize the Dash engine
+app = Dash(__name__)
+server = app.server
+
+# 2. The Data Ingestion
+try:
+    # --- UPDATE THIS TO YOUR ACTUAL SQL VIEW NAME ---
+    query = 'SELECT * FROM your_dashboard_view;' 
+    data = pd.read_sql(query, DB_URL)
+    connection_status = "Live Cloud Connection: SUCCESS ✅"
+except Exception as e:
+    data = pd.DataFrame() 
+    connection_status = f"Database Connection FAILED ❌: {e}"
+
+# 3. The Analytical Engine (Calculations & Charts)
+if not data.empty:
+    # --- KPI Calculations ---
+    total_exposure = data['loan_amount'].sum()
+    capital_loss = data.loc[data['is_default'] == 1, 'loan_amount'].sum()
+    default_rate = (data['is_default'].mean()) * 100
+    avg_term = data['term_months'].mean()
+
+    # Format KPI strings for the UI
+    exposure_str = f"${total_exposure / 1e9:.2f}bn" if total_exposure > 1e9 else f"${total_exposure / 1e6:.2f}M"
+    loss_str = f"${capital_loss / 1e6:.2f}M"
+    rate_str = f"{default_rate:.2f}%"
+    term_str = f"{avg_term:.2f}"
+
+    # --- Chart 1: Risk by Industry (Bar) ---
+    sector_df = data.groupby('sector_name', as_index=False)['is_default'].mean().sort_values('is_default', ascending=True)
+    fig_bar = px.bar(sector_df, x="is_default", y="sector_name", orientation='h', 
+                     title="Risk Distribution by Industry", color_discrete_sequence=['#1A5276'])
+    
+    # Add the 27% Threshold Line and format the tooltip
+    fig_bar.add_vline(x=0.27, line_dash="dash", line_color="#E74C3C", annotation_text="27% Threshold", annotation_position="bottom right")
+    fig_bar.update_traces(hovertemplate='<b>%{y}</b><br>Default Rate: %{x:.2%}<extra></extra>')
+    fig_bar.update_layout(xaxis_tickformat='.0%', paper_bgcolor='white', plot_bgcolor='white', 
+                          xaxis_title=None, yaxis_title=None)
+
+    # --- Chart 2: State Map (Choropleth) ---
+    state_df = data.groupby('bank_state', as_index=False)['is_default'].mean()
+    fig_map = px.choropleth(state_df, locations='bank_state', locationmode="USA-states", color='is_default',
+                            scope="usa", title="State-Level Risk Distribution", color_continuous_scale="Blues")
+    
+    # Remove the colorbar and format the tooltip
+    fig_map.update_layout(coloraxis_showscale=False, paper_bgcolor='white', plot_bgcolor='white')
+    fig_map.update_traces(hovertemplate='<b>%{location}</b><br>Default Rate: %{z:.2%}<extra></extra>')
+
+else:
+    # Safe Fallbacks if data fails
+    exposure_str = loss_str = rate_str = term_str = "N/A"
+    fig_bar = px.bar(title="Awaiting Sector Data")
+    fig_map = px.choropleth(title="Awaiting State Data")
+
+# 4. The Frontend Layout (Power BI Inspired CSS)
+card_style = {
+    'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '8px', 
+    'boxShadow': '0 4px 6px rgba(0,0,0,0.1)', 'textAlign': 'center', 'flex': '1', 'margin': '0 10px'
+}
+
+app.layout = html.Div(style={'backgroundColor': '#F0F2F6', 'minHeight': '100vh', 'padding': '30px', 'fontFamily': 'Segoe UI, Arial, sans-serif'}, children=[
+    
+    # Header
+    html.Div(style={'textAlign': 'center', 'marginBottom': '30px', 'backgroundColor': 'white', 'padding': '15px', 'borderRadius': '8px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.05)'}, children=[
+        html.H1("SBA PORTFOLIO: LIQUIDITY RISK", style={'color': '#2C3E50', 'margin': '0', 'fontWeight': 'bold'}),
+        html.Div(connection_status, style={'color': '#27AE60', 'fontSize': '12px', 'marginTop': '5px'})
+    ]),
+
+    # KPI Row 
+    html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '20px'}, children=[
+        html.Div(style=card_style, children=[
+            html.H2(exposure_str, style={'fontSize': '36px', 'margin': '0', 'color': '#2C3E50'}),
+            html.P("Total Exposure", style={'color': '#7F8C8D', 'margin': '5px 0 0 0', 'fontWeight': 'bold'})
+        ]),
+        html.Div(style=card_style, children=[
+            html.H2(loss_str, style={'fontSize': '36px', 'margin': '0', 'color': '#2C3E50'}),
+            html.P("Total Capital Loss", style={'color': '#7F8C8D', 'margin': '5px 0 0 0', 'fontWeight': 'bold'})
+        ]),
+        html.Div(style=card_style, children=[
+            html.H2(rate_str, style={'fontSize': '36px', 'margin': '0', 'color': '#2C3E50'}),
+            html.P("Default Rate", style={'color': '#7F8C8D', 'margin': '5px 0 0 0', 'fontWeight': 'bold'})
+        ]),
+        html.Div(style=card_style, children=[
+            html.H2(term_str, style={'fontSize': '36px', 'margin': '0', 'color': '#2C3E50'}),
+            html.P("Average Term", style={'color': '#7F8C8D', 'margin': '5px 0 0 0', 'fontWeight': 'bold'})
+        ])
+    ]),
+
+    # Charts Row
+    html.Div(style={'display': 'flex', 'justifyContent': 'space-between'}, children=[
+        html.Div(style={'width': '48%', 'backgroundColor': 'white', 'borderRadius': '8px', 'boxShadow': '0 4px 6px rgba(0,0,0,0.1)', 'padding': '15px'}, children=[
+            dcc.Graph(figure=fig_bar)
+        ]),
+        html.Div(style={'width': '48%', 'backgroundColor': 'white', 'borderRadius': '8px', 'boxShadow': '0 4px 6px rgba(0,0,0,0.1)', 'padding': '15px'}, children=[
+            dcc.Graph(figure=fig_map)
+        ])
+    ])
+])
+
+if __name__ == '__main__':
+    app.run(debug=True)
