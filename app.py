@@ -108,7 +108,7 @@ app.layout = html.Div(style={'backgroundColor': '#F8F9FA', 'minHeight': '100vh',
             dcc.Input(id='input-amount', type='number', value=150000, style={'width': '100%', 'padding': '4px', 'marginBottom': '8px'}),
             
             html.Label("Amortization Term (Months):", style={'fontWeight': 'bold', 'color': '#34495E', 'fontSize': '12px'}),
-            dcc.Slider(id='input-term', min=12, max=240, step=12, value=84, marks={12: '1Yr', 84: '7Yr', 240: '20Yr'}),
+            dcc.Slider(id='input-term', min=12, max=240, step=1, value=84, marks={12: '1Yr', 84: '7Yr', 240: '20Yr'}, tooltip={"placement": "bottom", "always_visible": True}),
             html.Br(),
             
             html.Label("Macroeconomic CPI:", style={'fontWeight': 'bold', 'color': '#34495E', 'fontSize': '12px'}),
